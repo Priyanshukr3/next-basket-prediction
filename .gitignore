@@ -1,0 +1,4 @@
+data/
+*.npy
+*.h5
+__pycache__/
