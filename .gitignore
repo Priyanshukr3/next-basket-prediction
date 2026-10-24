@@ -1,4 +1,34 @@
+# Completely ignore the data folder
 data/
+*.csv
+*.xlsx
+*.tsv
+
+# Ignore multi-hot encoded arrays and embeddings
 *.npy
+*.npz
+*.pkl
 *.h5
+
+# Ignore python environment folders
+.venv/
+venv/
+env/
+vitrualenv/
+
+
+# Ignore compiled bytecode that Python generates automatically
 __pycache__/
+*.py[cod]
+*$py.class
+
+
+# Ignore the hidden auto-save checkpoints Jupyter creates
+.ipynb_checkpoints/
+
+
+# Ignore VS Code workspace settings and Windows thumbnail caches
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
