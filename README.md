@@ -14,6 +14,8 @@ We are using the **Ta Feng Grocery Dataset** (4 months of transaction logs).
    `conda activate vitrualenv`
 3. Install dependencies:
    `pip install -r requirements.txt`
+   - If (NVIDIA) GPU support is required:
+      `pip install tensorflow[and-cuda]`
 
 
 * `notebooks/01_data_eda.ipynb`: Loads the Ta Feng data, maps the top 1,000 most frequent items, groups rare items into a single token, and constructs chronological sequence arrays for each user.
