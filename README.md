@@ -4,8 +4,6 @@ This project implements a hybrid deep learning pipeline to predict a customer's 
 
 ## Dataset
 We are using the **Ta Feng Grocery Dataset** (4 months of transaction logs).
-* Download the dataset from Kaggle.
-* Place the merged CSV file at: `data/raw/ta_feng_all_months_merged.csv`.
 
 ## Environment Setup
 1. Create a Conda environment:
@@ -14,6 +12,9 @@ We are using the **Ta Feng Grocery Dataset** (4 months of transaction logs).
    `conda activate vitrualenv`
 3. Install dependencies:
    `pip install -r requirements.txt`
+   - If (NVIDIA) GPU support is required:
+      `pip install tensorflow[and-cuda]`
 
-
-* `notebooks/01_data_eda.ipynb`: Loads the Ta Feng data, maps the top 1,000 most frequent items, groups rare items into a single token, and constructs chronological sequence arrays for each user.
+## Notebook details
+- `notebooks/01_data_eda.ipynb`: Loads the Ta Feng data, maps the top 1,000 most frequent items, groups rare items into a single token, and constructs chronological sequence arrays for each user.
+- `notebooks/02_RBM.ipynb`: Contains RBM class, loads the preprocessed data, trains a RBM model, extracts dense feature representations and packs them in a suitable format for comparison with LSTM model.
