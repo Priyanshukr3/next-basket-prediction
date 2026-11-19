@@ -6,3 +6,4 @@ tensorflow
 matplotlib
 tqdm
 kagglehub
+pytest
