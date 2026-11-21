@@ -69,15 +69,6 @@ class RBM(tf.keras.Model):
         return self(v)
 
     def build(self, input_shape):
-        self.W = self.add_weight(shape=(self.visible_units, self.hidden_units),
-                                initializer=tf.random_normal_initializer(stddev=0.1),
-                                name='weights')
-        self.hb = self.add_weight(shape=(self.hidden_units,),
-                                 initializer=tf.zeros_initializer(),
-                                 name='hidden_bias')
-        self.vb = self.add_weight(shape=(self.visible_units,),
-                                 initializer=tf.zeros_initializer(),
-                                 name='visible_bias')
         super().build(input_shape)
 
 
@@ -120,17 +111,17 @@ def train_rbm_parallel(visible_units,
                        data,
                        epochs=50, batch_size=256,
                        learning_rate=0.01, k=1,
-                       strategy=tf.distribute.MirroredStrategy()):
+                       strategy=None):
+    if strategy is None:
+        strategy = tf.distribute.MirroredStrategy()
     with strategy.scope():
         rbm = RBM(visible_units=visible_units, hidden_units=hidden_units, learning_rate=learning_rate, k=k)
-        # optimizer = Adam(learning_rate=learning_rate)
         optimizer = Adam(learning_rate=learning_rate, clipvalue=1.0)
-        # optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=0.9)
         rbm.build((None, visible_units))
 
     dataset = tf.data.Dataset.from_tensor_slices(data).batch(batch_size, drop_remainder=True).prefetch(tf.data.AUTOTUNE)
     dist_dataset = strategy.experimental_distribute_dataset(dataset)
-
+    
     @tf.function
     def train_step(batch):
         def step_fn(batch):
