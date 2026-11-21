@@ -3,3 +3,7 @@ numpy
 scikit-learn
 jupyter
 tensorflow
+matplotlib
+tqdm
+kagglehub
+pytest
