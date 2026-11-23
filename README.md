@@ -1,60 +1,153 @@
 # Next Basket Prediction (NBP)
 
-This project implements a hybrid deep learning pipeline to predict a customer's next itemset based on their transaction history, capturing both spatial item co-occurrences and sequential temporal patterns.
+This project implements a hybrid deep learning pipeline to predict a customer's next itemset based on their transaction history, capturing both intra-basket item co-occurrences and sequential temporal patterns.
 
 ## Dataset
-We are using the **Ta Feng Grocery Dataset** (4 months of transaction logs).
+This project uses the **Ta Feng Grocery Dataset** (4 months of transaction logs: 119,578 transactions, 32,266 users, and 23,812 unique items). The dataset is downloaded automatically via `kagglehub` when running `notebooks/01_data_eda.ipynb`.
 
-## Environment Setup
-### Conda
-1. Create a Conda environment:
-   `conda create --name vitrualenv python=3.12`
-2. Activate the environment:
-   `conda activate vitrualenv`
-3. Install dependencies:
-   `pip install -r requirements.txt`
-   - If (NVIDIA) GPU support is required:
-      `pip install tensorflow[and-cuda]`
+## Quick Environment Setup (All-in-One)
 
-### Python
-1. Create a virtual environment:
-   `python venv .venv`
-2. Activate the environment:
-   **Linux/MacOS bash**
-   `source .venv/bin/activate`
-   **Windows PowerShell**
-   `.venv\bin\Activate.ps1`
-3. Install dependencies:
-   `pip install -r requirements.txt`
-   - If (NVIDIA) GPU support is required:
-      `pip install tensorflow[and-cuda]`
+### Option 1: Conda 
+Run the following command from the project root to create the environment, install all dependencies, and register the Jupyter kernel at once:
 
+```bash
+conda create -n nbp-env python=3.12 -y && conda activate nbp-env && pip install -r requirements.txt && python -m ipykernel install --user --name=nbp-env --display-name "Python 3.12 (nbp-env)"
+```
 
-## Notebook details
-The notebooks form the part of two separate pipelines.
-The notebook for each pipeline is in the format `0X_<NAME>.ipynb`, where `X `is the
-step number for the pipeline, and `<NAME>` is a descriptive name for the step that the
-notebook represents.
+*(For NVIDIA GPU support on Linux/WSL2, replace `pip install -r requirements.txt` with `pip install -r requirements.txt && pip install "tensorflow[and-cuda]"`.)*
 
-### Shared
-- `notebooks/01_data_eda.ipynb`: Loads the Ta Feng data, maps the top 1,000 most frequent items, groups rare items into a single token, and constructs chronological sequence arrays for each user.
+### Option 2: Python `venv`
 
-### RBM pipeline
-- `notebooks/02_RBM.ipynb`: Loads the preprocessed data, trains the RBM, extracts dense hidden-layer features for each basket, and saves them as X_rbm_dense.npy for the LSTM.
-- `src/RBM.py`: The RBM class and its training, feature extraction, and save/load functions.
+**Linux / macOS / WSL2 (Bash):**
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && python -m ipykernel install --user --name=nbp-venv --display-name "Python 3.12 (nbp-venv)"
+```
 
-### LSTM pipeline
-- `notebooks/02_Data_loading.ipynb`: Builds the training, validation and test examples from each user’s sequence, checks that validation and test targets are not used for training, and saves the splits.
-- `notebooks/03_LSTM_Architecture_Example.ipynb`: Trains the RBM-blended LSTM over a small hyperparameter grid, selects the best model on validation, saves it, and writes its test scores.
-- `notebooks/03_raw-history-LSTM.ipynb`: The raw-history variant. It feeds the multi-hot history without the RARE column, with the same training setup, and compares it against the RBM-blended model.
-- `src/LSTM.py`: The LSTM model class featuring one LSTM layer with dropout, a sigmoid output over the items, and binary cross-entropy loss.
+**Windows (PowerShell):**
+```powershell
+py -3.12 -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt; python -m ipykernel install --user --name=nbp-venv --display-name "Python 3.12 (nbp-venv)"
+```
 
-### Baselines and evaluation
-- `notebooks/03_Validation_Baseline.ipynb`: Checks the RBM input data, builds the Most Popular and FP-Growth baselines, and saves their scores.
-- `notebooks/04_Error_Analysis.ipynb`: Compares the models by history length, checks how often RARE ranks first, and tests score cutoffs.
+---
 
-## Pytest details
-Pytest tests for RBM metrics is provided under 2 files as below:
-- `src/metrics.py`: Computes Hit-Ratio and Recall@K, ignores the RARE token, and compares models against a baseline.
-- `tests/metrics.py`: Tests for the metrics functions.
+## Running the Pipeline
 
+Execute the notebooks in the following order:
+
+1. `notebooks/01_data_eda.ipynb` — Downloads Ta Feng via `kagglehub`, maps the top 1,000 items deterministically, groups rare items into index `0`, and saves leak-free `X_raw.npy`, `X_padded.npy`, and `y_target.npy`.
+2. `notebooks/02_Data_loading.ipynb` — Constructs chronological train/validation/test sliding-window splits and saves `splits.npz`.
+3. `notebooks/02_RBM.ipynb` — Trains the RBM (`1001 -> 500`) on training baskets only and exports `X_rbm_dense.npy` and `rbm.weights.h5`.
+4. `notebooks/03_Validation_Baseline.ipynb` — Runs data integrity diagnostics, builds the Most Popular and FP-Growth baselines, and saves baseline scores and reports.
+5. `notebooks/03_LSTM_Architecture_Example.ipynb` — Runs hyperparameter search for the RBM + Masked LSTM (`WeightedBinaryCrossentropy` + `RepeatGate`), saves `lstm_best.keras`, and writes test scores.
+6. `notebooks/03_raw-history-LSTM.ipynb` — Trains the fair Raw-History LSTM ablation (without RBM compression) and compares it against RBM + LSTM and baselines.
+7. `notebooks/04_Error_Analysis.ipynb` — Evaluates overall metrics, history-length breakdowns, top-1 item diversity, and threshold curves.
+
+---
+
+## Source Modules & Tests
+
+- `src/RBM.py`: Single-layer RBM class along with training, feature extraction, and weight save/load utilities.
+- `src/LSTM.py`: Masked unidirectional LSTM with Layer Normalization, `WeightedBinaryCrossentropy`, and the `RepeatGate` output-layer residual branch.
+- `src/metrics.py`: Computes HitRatio@K, Recall@K, and lift over baseline while excluding the `<RARE_ITEM>` token and rare-only targets.
+- `tests/metrics.py`: Unit tests for the evaluation metrics.
+
+### Running Unit Tests
+```bash
+python -m pytest tests/metrics.py
+```
+
+*(If Windows throws a `pytest11` plugin error, run `set PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 && python -m pytest tests/metrics.py`.)*
+
+### Unified CLI Comparison
+After generating all model score matrices in `data/predictions/`, print a combined comparison table with:
+
+```bash
+python -m src.metrics \
+  --targets data/processed/y_target.npy \
+  --scores MostPop=data/predictions/most_popular_scores.npy \
+           FPGrowth=data/predictions/fpgrowth_scores.npy \
+           RawLSTM=data/predictions/raw_lstm_test_scores.npy \
+           RBMLSTM=data/predictions/lstm_test_scores.npy \
+  --k 1 3 5 9 \
+  --baseline MostPop \
+  --output data/reports/final_comparison.json
+```# Next Basket Prediction (NBP)
+
+This project implements a hybrid deep learning pipeline to predict a customer's next itemset based on their transaction history, capturing both intra-basket item co-occurrences and sequential temporal patterns.
+
+## Dataset
+This project uses the **Ta Feng Grocery Dataset** (4 months of transaction logs: 119,578 transactions, 32,266 users, and 23,812 unique items). The dataset is downloaded automatically via `kagglehub` when running `notebooks/01_data_eda.ipynb`.
+
+## Quick Environment Setup (All-in-One)
+
+> **Requirements:** Python **3.12** is required for TensorFlow compatibility.  
+> **NVIDIA GPU Note:** TensorFlow >= 2.11 requires **Linux or WSL2** for CUDA GPU acceleration (native Windows runs on CPU).
+
+### Option 1: Conda (Recommended)
+Run the following command from the project root to create the environment, install all dependencies, and register the Jupyter kernel at once:
+
+```bash
+conda create -n nbp-env python=3.12 -y && conda activate nbp-env && pip install -r requirements.txt && python -m ipykernel install --user --name=nbp-env --display-name "Python 3.12 (nbp-env)"
+```
+
+### Option 2: Python `venv`
+
+**Linux / macOS / WSL2 (Bash):**
+```bash
+python3.12 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && python -m ipykernel install --user --name=nbp-venv --display-name "Python 3.12 (nbp-venv)"
+```
+
+**Windows (PowerShell):**
+```powershell
+py -3.12 -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.txt; python -m ipykernel install --user --name=nbp-venv --display-name "Python 3.12 (nbp-venv)"
+```
+
+**Windows (Command Prompt):**
+```cmd
+py -3.12 -m venv .venv && .venv\Scripts\activate.bat && pip install -r requirements.txt && python -m ipykernel install --user --name=nbp-venv --display-name "Python 3.12 (nbp-venv)"
+```
+
+When opening any notebook in VS Code or Jupyter, select the **Python 3.12 (nbp-env)** or **Python 3.12 (nbp-venv)** kernel.
+
+---
+
+## Running the Pipeline
+
+Execute the notebooks in the following order:
+
+1. `notebooks/01_data_eda.ipynb` — Downloads Ta Feng via `kagglehub`, maps the top 1,000 items deterministically, groups rare items into index `0`, and saves leak-free `X_raw.npy`, `X_padded.npy`, and `y_target.npy`.
+2. `notebooks/02_Data_loading.ipynb` — Constructs chronological train/validation/test sliding-window splits and saves `splits.npz`.
+3. `notebooks/02_RBM.ipynb` — Trains the RBM (`1001 -> 500`) on training baskets only and exports `X_rbm_dense.npy` and `rbm.weights.h5`.
+4. `notebooks/03_Validation_Baseline.ipynb` — Runs data integrity diagnostics, builds the Most Popular and FP-Growth baselines, and saves baseline scores and reports.
+5. `notebooks/03_LSTM_Architecture_Example.ipynb` — Runs hyperparameter search for the RBM + Masked LSTM (`WeightedBinaryCrossentropy` + `RepeatGate`), saves `lstm_best.keras`, and writes test scores.
+6. `notebooks/03_raw-history-LSTM.ipynb` — Trains the fair Raw-History LSTM ablation (without RBM compression) and compares it against RBM + LSTM and baselines.
+7. `notebooks/04_Error_Analysis.ipynb` — Evaluates overall metrics, history-length breakdowns, top-1 item diversity, and threshold curves.
+
+---
+
+## Source Modules & Tests
+
+- `src/RBM.py`: Single-layer RBM class along with training, feature extraction, and weight save/load utilities.
+- `src/LSTM.py`: Masked unidirectional LSTM with Layer Normalization, `WeightedBinaryCrossentropy`, and the `RepeatGate` output-layer residual branch.
+- `src/metrics.py`: Computes HitRatio@K, Recall@K, and lift over baseline while excluding the `<RARE_ITEM>` token and rare-only targets.
+- `tests/metrics.py`: Unit tests for the evaluation metrics.
+
+### Running Unit Tests
+```bash
+python -m pytest tests/metrics.py
+```
+
+### Unified CLI Comparison
+After generating all model score matrices in `data/predictions/`, print a combined comparison table with:
+
+```bash
+python -m src.metrics \
+  --targets data/processed/y_target.npy \
+  --scores MostPop=data/predictions/most_popular_scores.npy \
+           FPGrowth=data/predictions/fpgrowth_scores.npy \
+           RawLSTM=data/predictions/raw_lstm_test_scores.npy \
+           RBMLSTM=data/predictions/lstm_test_scores.npy \
+  --k 1 3 5 9 \
+  --baseline MostPop \
+  --output data/reports/final_comparison.json
+```

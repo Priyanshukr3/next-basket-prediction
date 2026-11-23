@@ -1,9 +1,11 @@
-pandas
+tensorflow>=2.16,<2.20
 numpy
-scikit-learn
-jupyter
-tensorflow
-matplotlib
-tqdm
+pandas
 kagglehub
+matplotlib
+seaborn
+mlxtend
+tqdm
 pytest
+ipykernel
+jupyter
